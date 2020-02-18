@@ -1,11 +1,13 @@
 package lk.icoder.wssession.controller;
 
 import com.google.gson.Gson;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.messaging.simp.SimpMessageType;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Controller;
@@ -30,8 +32,8 @@ public class WebSocketController {
         this.messagingTemplate = messagingTemplate;
     }
 
-//    @MessageMapping("/message")
-    @SubscribeMapping("/message")
+    @MessageMapping("/message")
+//    @SubscribeMapping("/message")
     public void processMessageFromClient(@Payload String message,
                                          SimpMessageHeaderAccessor headerAccessor) throws Exception {
 
@@ -39,7 +41,10 @@ public class WebSocketController {
         System.out.println("---processMessageFromClient -----" +  sessionId);
         headerAccessor.setSessionId(sessionId);
 //        messagingTemplate.convertAndSend("/topic/reply", new Gson().fromJson(message, Map.class).get("name"));
-        testMessage(message, sessionId);
+        messagingTemplate
+                .convertAndSendToUser(sessionId, "/topic/reply", new Gson().fromJson(message, Map.class).get("name"),
+                        headerAccessor.getMessageHeaders());
+//        testMessage(message, sessionId);
     }
 
     @PostMapping("/push/{message}/{sessionId}")
@@ -62,5 +67,11 @@ public class WebSocketController {
         headerAccessor.setLeaveMutable(true);
 //        messagingTemplate.convertAndSendToUser(sessionId, "/topic/reply", message, headerAccessor.getMessageHeaders());
         messagingTemplate.convertAndSend("/topic/reply",  new Gson().fromJson(message, Map.class).get("name"), headerAccessor.getMessageHeaders());
+    }
+
+    @MessageExceptionHandler
+    @SendToUser("/queue/errors")
+    public String handleException(Throwable exception) {
+        return exception.getMessage();
     }
 }
